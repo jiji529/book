@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="orders"> 
+	<sql id="search">
+		select orders.* , customer.name, customer.phone from orders join customer on orders.CUSTID = customer.CUSTID
+		<where>
+
+			<if test="search == 1"> 
+				orderid=#{keyword}
+			</if>
+			
+			<if test="search == 2"> 
+				custid=#{custid}
+			</if>
+			
+		</where>
+		order by orderid
+	</sql>
+
+	<select id="total" resultType="Integer">
+		SELECT COUNT(*) FROM (<include refid="search"></include>)
+	</select>
+
+	<select id="list" resultType="Orders">
+		select * 
+			from (select sub.*, ROWNUM rnum 
+				from (<include refid="search"></include>) sub)
+		
+		<if test="perPage != 0">
+			<![CDATA[
+			where rnum > ((#{page}-1)*#{perPage}) and rnum <= (#{page}*#{perPage})
+			]]>
+		</if>
+	</select>
+	
+	<insert id="add">
+		INSERT INTO orders
+		VALUES (SEQ_ORDER.NEXTVAL, #{custid}, #{saleprice}, SYSDATE)
+		
+		<selectKey keyProperty="orderid" resultType="Long" order="AFTER">
+			SELECT SEQ_ORDER.currval FROM dual
+		</selectKey>
+	</insert>
+	
+	<insert id="add_detail">
+		INSERT INTO DETAIL
+		VALUES (SEQ_DETAIL.NEXTVAL, #{bookid}, #{orderid}, #{amount})
+	</insert>
+	
+	<resultMap type="Orders" id="ordersMap" autoMapping="true">
+		<!-- <id> : PK -->
+		<id property="orderid" column="orderid"/>
+		<!-- 이름을 맞춰놨으니까 객체의 필드를 입력하는 <result property="" column=""/> 대신 autoMappin="true"로 대체. -->
+		
+		<!-- column은 객체(orders) 안에 있는 collection(details)의 외래키의 alias -->
+		<!-- collection(details) 안에 하나씩 들어있는 타입 -->
+		<collection property="details" column="oid" javaType="ArrayList" ofType="Detail" autoMapping="true">
+			<id property="code" column="code" />
+		</collection>
+		
+	</resultMap>
+	
+	<select id="item" resultMap="ordersMap" >
+		select orders.*, detail.*, detail.orderid as oid, book.bookname, book.publisher
+		from orders join detail on orders.orderid = detail.orderid
+		join book on detail.bookid=book.bookid 
+		where orders.orderid=#{orderid}
+	</select>
+	
+</mapper>

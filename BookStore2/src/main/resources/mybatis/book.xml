@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="book"> 
+
+	<select id="list_cart" resultType="Book">
+		SELECT * FROM book
+		
+		<!-- sql문에의 where in 구현, 
+		1. collection은 보통 list를 받는데, cart가 map형태이니까 index는 bookid, value로 amount 사용.
+		2. mybatis는 collection로 getter를 받음. 
+		   예외로 단일객체(Integer, String 등)처럼 대문자로 시작하는 것들은 getter가 아닌 단일객체로 받아들임.
+		   -> but 지금 map 형태인 cart는 get으로 값 못 가져옴 -> getCart를 할 수 있도록 daoImpl에서 map에 한 번 더 넣어! -->
+		<where>
+			<foreach collection="cart" open="bookid IN (" close=")" separator="," index="bookid" item="amount">
+				${bookid}
+			</foreach>
+		</where>
+		
+	</select>
+
+	<sql id="search">
+		select * from book 
+		<where>
+
+			<if test="search == 1"> <!-- 도서번호 -->
+				bookid=#{keyword}
+			</if>
+			
+			<if test="search == 2"> <!-- 도서명 -->
+				bookname LIKE CONCAT(CONCAT('%', #{keyword}), '%')
+			</if>
+			
+			<if test="search == 3"> <!-- 도서명 -->
+				publisher LIKE CONCAT(CONCAT('%', #{keyword}), '%')
+			</if>
+		</where>
+		order by bookid
+	</sql>
+
+	<select id="total" resultType="Integer">
+		SELECT COUNT(*) FROM (<include refid="search"></include>)
+	</select>
+
+	<select id="list" resultType="Book">
+		select * 
+			from (select sub.*, ROWNUM rnum 
+				from (<include refid="search"></include>) sub)
+		
+		<if test="perPage != 0">
+			<![CDATA[
+			where rnum > ((#{page}-1)*#{perPage}) and rnum <= (#{page}*#{perPage})
+			]]>
+		</if>
+	</select>
+	
+	<select id="item" resultType="Book">
+		SELECT * FROM book 
+		WHERE bookid=#{bookid}
+	</select>
+	
+	<insert id="add">
+		INSERT INTO book
+		VALUES (SEQ_BOOK.nextval, #{bookname}, #{publisher}, #{price})
+	</insert>
+	
+	<update id="update">
+		UPDATE book
+		SET bookname=#{bookname}, publisher=#{publisher}, price=#{price}
+		WHERE bookid=#{bookid}
+	</update>
+	
+	<delete id="delete">
+		DELETE FROM book
+		WHERE bookid=#{bookid}
+	</delete>
+</mapper>
